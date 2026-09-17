@@ -1,0 +1,63 @@
+// Example/default ACLs for unrestricted connections.
+{
+	// Define users and devices that can use Tailscale SSH.
+	"ssh": [
+		// Allow all users to SSH into their own devices in check mode.
+		// Comment this section out if you want to define specific restrictions.
+		{
+			"action": "check",
+			"src":    ["autogroup:member"],
+			"dst":    ["autogroup:self"],
+			"users":  ["autogroup:nonroot", "root"],
+		},
+	],
+
+	"nodeAttrs": [
+		{
+			// Funnel policy, which lets tailnet members control Funnel
+			// for their own devices.
+			// Learn more at https://tailscale.com/kb/1223/tailscale-funnel/
+			"target": ["autogroup:member"],
+
+			"attr": ["funnel"],
+		},
+	],
+
+	"grants": [
+		// Allow CROUTON committee members to access CROUTON devices over the network. Note that Tailscale admins are implicitly granted access, so we don't need to mention them in the source here.
+		{
+			"src": ["group:crouton-committee"],
+			"dst": ["tag:crouton-devices"],
+			"ip":  ["*"],
+		},
+		{
+			"src": ["group:vex"],
+			"dst": ["tag:vex-devices"],
+			"ip":  ["*"],
+		},
+	],
+
+	"groups": {
+		// Access to CROUTON machines for committee members who are not GitHub admins
+		"group:crouton-committee": ["jasonappah@github"],
+
+		"group:vex": ["j5155@github", "Udunen@github"],
+	},
+
+	"tagOwners": {
+		// Devices which only CROUTON Committee members should have access to. Mainly used for the server which hosts Club Manager.
+		"tag:crouton-devices": [],
+
+		// Devices which only VEX members should have access to. Will be used for remote access to team's Jetson Nano machines
+		"tag:vex-devices": [],
+	},
+
+	// Test access rules every time they're saved.
+	// "tests": [
+	//   {
+	//       "src": "alice@example.com",
+	//       "accept": ["tag:example"],
+	//       "deny": ["100.101.102.103:443"],
+	//   },
+	// ],
+}
