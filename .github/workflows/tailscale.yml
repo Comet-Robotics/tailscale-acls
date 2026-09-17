@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v6
 
       # Pull requests get a READ-ONLY credential (policy_file:read), whose trust
-      # credential is scoped to subject repo:<repo>:pull_request. A PR therefore
+      # credential is scoped to subject repo:...@<repo id>:pull_request. A PR therefore
       # cannot apply ACLs even if it edits this workflow.
       - name: Test ACL
         if: github.event_name == 'pull_request'
@@ -31,7 +31,8 @@ jobs:
           action: test
 
       # Only pushes to main get the write credential, whose trust credential is
-      # scoped to subject repo:<repo>:ref:refs/heads/main.
+      # scoped to subject repo:...@<repo id>:ref:refs/heads/main. The ref check below
+      # is defense in depth for the same thing.
       - name: Deploy ACL
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: tailscale/gitops-acl-action@v1
