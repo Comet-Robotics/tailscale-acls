@@ -2,7 +2,7 @@ name: Sync Tailscale ACLs
 
 on:
   push:
-    branches: ["main", "setup-gitops-acls"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
@@ -21,14 +21,6 @@ jobs:
       # Pull requests get a READ-ONLY credential (policy_file:read), whose trust
       # credential is scoped to subject repo:<repo>:pull_request. A PR therefore
       # cannot apply ACLs even if it edits this workflow.
-      - name: DEBUG dump OIDC claims
-        env:
-          AUD: ${{ secrets.TS_AUDIENCE_TEST }}
-        run: |
-          TOK=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUD" | python3 -c 'import sys,json;print(json.load(sys.stdin)["value"])')
-          echo "$TOK" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | python3 -m json.tool || true
-
       - name: Test ACL
         if: github.event_name == 'pull_request'
         uses: tailscale/gitops-acl-action@v1
