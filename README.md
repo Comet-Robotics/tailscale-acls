@@ -20,8 +20,8 @@ and nothing to rotate. Two Tailscale trust credentials are used, deliberately sp
 
 | Secret | Trust credential subject | Scopes | Used by |
 |---|---|---|---|
-| `TS_OAUTH_ID_TEST` / `TS_AUDIENCE_TEST` | `repo:Comet-Robotics/tailscale-acls:pull_request` | `policy_file` read | PR `test` |
-| `TS_OAUTH_ID_APPLY` / `TS_AUDIENCE_APPLY` | `repo:Comet-Robotics/tailscale-acls:ref:refs/heads/main` | `policy_file` read+write | `main` `apply` |
+| `TS_OAUTH_ID_TEST` / `TS_AUDIENCE_TEST` | `repo:Comet-Robotics@144856039/tailscale-acls@1374575717:pull_request` | `policy_file` read | PR `test` |
+| `TS_OAUTH_ID_APPLY` / `TS_AUDIENCE_APPLY` | `repo:Comet-Robotics@144856039/tailscale-acls@1374575717:ref:refs/heads/main` | `policy_file` read+write | `main` `apply` |
 
 The split matters: because the write credential's subject is pinned to
 `refs/heads/main`, a pull request cannot apply ACLs **even if the PR edits the
@@ -29,11 +29,36 @@ workflow file**. A single credential would not give you that.
 
 `TS_TAILNET` is `comet-robotics.org.github`.
 
+Note the `@<id>` suffixes: this org has GitHub's ID-suffixed OIDC subject claims
+enabled, so the `sub` is **not** the `repo:OWNER/REPO:...` form shown in Tailscale's
+docs. If a credential starts returning `token exchange failed with status 403`,
+dump the token's real `sub` claim in CI before editing anything. (The suffixes are
+a feature: they pin trust to repo *IDs*, so deleting and recreating a repo with the
+same name does not inherit its tailnet access.)
+
 Trust credentials live in the admin console under
 Settings → [Trust credentials](https://console.tailscale.com/admin/settings/trust-credentials).
 
+## Formatting
+
+`policy.hujson` is HuJSON — JSON with comments and trailing commas. Prettier, Biome
+and ruff can't parse that, so formatting is handled by a small stdlib-only script:
+
+```
+python3 scripts/fmt_policy.py           # fix in place
+python3 scripts/fmt_policy.py --check   # what CI runs
+```
+
+It validates that the policy parses, and keeps every member of a `groups` or
+`tagOwners` list on its own line. That second part is the point: since adding and
+removing people happens by PR, a one-per-line array means a new member is a
+one-line diff instead of a rewritten array that's hard to review.
+
+CI runs `--check` before the Tailscale action on every PR and push, so a malformed
+policy fails the build rather than reaching the tailnet.
+
 ## Notes
 
-- `policy.hujson` is HuJSON (JSON with comments and trailing commas). Keep the comments.
+- Keep the comments in `policy.hujson` — they survive the round trip to Tailscale.
 - Group membership is driven by GitHub identities (`user@github`), since this tailnet
   uses GitHub as its identity provider.

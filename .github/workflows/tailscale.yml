@@ -1,0 +1,48 @@
+name: Sync Tailscale ACLs
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  # Required so the Tailscale action can request a GitHub OIDC token and
+  # exchange it for a tailnet API token via federated identity.
+  id-token: write
+
+jobs:
+  acls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Runs on both events, before the tailnet is touched: a malformed policy
+      # or a collapsed group array fails the PR rather than reaching Tailscale.
+      - name: Lint policy file
+        run: python3 scripts/fmt_policy.py --check
+
+      # Pull requests get a READ-ONLY credential (policy_file:read), whose trust
+      # credential is scoped to subject repo:...@<repo id>:pull_request. A PR therefore
+      # cannot apply ACLs even if it edits this workflow.
+      - name: Test ACL
+        if: github.event_name == 'pull_request'
+        uses: tailscale/gitops-acl-action@v1
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_ID_TEST }}
+          audience: ${{ secrets.TS_AUDIENCE_TEST }}
+          tailnet: ${{ secrets.TS_TAILNET }}
+          action: test
+
+      # Only pushes to main get the write credential, whose trust credential is
+      # scoped to subject repo:...@<repo id>:ref:refs/heads/main. The ref check below
+      # is defense in depth for the same thing.
+      - name: Deploy ACL
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: tailscale/gitops-acl-action@v1
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_ID_APPLY }}
+          audience: ${{ secrets.TS_AUDIENCE_APPLY }}
+          tailnet: ${{ secrets.TS_TAILNET }}
+          action: apply
