@@ -18,6 +18,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Runs on both events, before the tailnet is touched: a malformed policy
+      # or a collapsed group array fails the PR rather than reaching Tailscale.
+      - name: Lint policy file
+        run: python3 scripts/fmt_policy.py --check
+
       # Pull requests get a READ-ONLY credential (policy_file:read), whose trust
       # credential is scoped to subject repo:...@<repo id>:pull_request. A PR therefore
       # cannot apply ACLs even if it edits this workflow.

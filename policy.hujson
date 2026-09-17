@@ -39,9 +39,14 @@
 
 	"groups": {
 		// Access to CROUTON machines for committee members who are not GitHub admins
-		"group:crouton-committee": ["jasonappah@github"],
+		"group:crouton-committee": [
+			"jasonappah@github",
+		],
 
-		"group:vex": ["j5155@github", "Udunen@github"],
+		"group:vex": [
+			"j5155@github",
+			"Udunen@github",
+		],
 	},
 
 	"tagOwners": {

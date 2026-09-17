@@ -39,8 +39,26 @@ same name does not inherit its tailnet access.)
 Trust credentials live in the admin console under
 Settings → [Trust credentials](https://console.tailscale.com/admin/settings/trust-credentials).
 
+## Formatting
+
+`policy.hujson` is HuJSON — JSON with comments and trailing commas. Prettier, Biome
+and ruff can't parse that, so formatting is handled by a small stdlib-only script:
+
+```
+python3 scripts/fmt_policy.py           # fix in place
+python3 scripts/fmt_policy.py --check   # what CI runs
+```
+
+It validates that the policy parses, and keeps every member of a `groups` or
+`tagOwners` list on its own line. That second part is the point: since adding and
+removing people happens by PR, a one-per-line array means a new member is a
+one-line diff instead of a rewritten array that's hard to review.
+
+CI runs `--check` before the Tailscale action on every PR and push, so a malformed
+policy fails the build rather than reaching the tailnet.
+
 ## Notes
 
-- `policy.hujson` is HuJSON (JSON with comments and trailing commas). Keep the comments.
+- Keep the comments in `policy.hujson` — they survive the round trip to Tailscale.
 - Group membership is driven by GitHub identities (`user@github`), since this tailnet
   uses GitHub as its identity provider.
