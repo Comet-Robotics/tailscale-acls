@@ -39,11 +39,22 @@ jobs:
       # A GITHUB_TOKEN push to a PR head does create a pull_request run, but
       # GitHub holds it in an approval-required state, so someone has to click
       # "Approve and run" before the acls check goes green. A GitHub App's push
-      # runs without that click. When
-      # the app secrets are present the fix self-completes, and when they are
-      # not this falls back to pushing with GITHUB_TOKEN and telling the author
-      # how to get a fresh run. `secrets` is readable here at job level, which
-      # is what lets the steps below branch on it.
+      # runs without that click, so with the app secrets present the fix
+      # self-completes; without them this falls back to GITHUB_TOKEN and the
+      # reply tells the author about the approval. (Re-running the old failed
+      # check is never a substitute: a re-run reuses the commit that triggered
+      # the original run, i.e. the unformatted one.) `secrets` is readable here
+      # at job level, which is what lets the steps below branch on it.
+      #
+      # To set the app up: create a GitHub App owned by the org (not a person,
+      # so it outlives them) with Webhook unchecked and exactly one repository
+      # permission, Contents: read and write -- comments and PR reads stay on
+      # GITHUB_TOKEN, which is also what keeps the loop guard above correct.
+      # Note its App ID, generate a private key, then *install* it on this repo
+      # (easy to miss: creating an app does not install it, and with no
+      # installation the token request 404s where a bad key 401s). Finally set
+      # the two secrets below. Installation tokens last an hour; the private key
+      # is durable and is the one credential here that needs rotating.
       HAVE_APP: ${{ secrets.FMT_APP_ID != '' && secrets.FMT_APP_PRIVATE_KEY != '' }}
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}

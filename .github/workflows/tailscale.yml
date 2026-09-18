@@ -35,6 +35,12 @@ jobs:
       # Pull requests get a READ-ONLY credential (policy_file:read), whose trust
       # credential is scoped to subject repo:...@<repo id>:pull_request. A PR therefore
       # cannot apply ACLs even if it edits this workflow.
+      #
+      # This is also why workflow_dispatch is not a way to re-trigger a stale
+      # check, even though dispatch events are exempt from the rule that a
+      # GITHUB_TOKEN push starts no run: on a dispatch this step is skipped and
+      # a branch-ref OIDC subject isn't trusted by either tailnet credential,
+      # so the run would report a green `acls` that never tested the policy.
       - name: Test ACL
         if: github.event_name == 'pull_request'
         uses: tailscale/gitops-acl-action@v1
