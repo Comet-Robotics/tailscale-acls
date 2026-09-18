@@ -1,9 +1,6 @@
-// Example/default ACLs for unrestricted connections.
 {
-	// Define users and devices that can use Tailscale SSH.
 	"ssh": [
 		// Allow all users to SSH into their own devices in check mode.
-		// Comment this section out if you want to define specific restrictions.
 		{
 			"action": "check",
 			"src":    ["autogroup:member"],
@@ -18,7 +15,6 @@
 			// for their own devices.
 			// Learn more at https://tailscale.com/kb/1223/tailscale-funnel/
 			"target": ["autogroup:member"],
-
 			"attr": ["funnel"],
 		},
 	],
@@ -33,6 +29,11 @@
 		{
 			"src": ["group:vex"],
 			"dst": ["tag:vex-devices"],
+			"ip":  ["*"],
+		},
+		{
+			"src": ["autogroup:member"],
+			"dst": ["tag:public-devices"],
 			"ip":  ["*"],
 		},
 	],
@@ -53,11 +54,20 @@
 
 	"tagOwners": {
 		// Devices which only CROUTON Committee members should have access to. Mainly used for the server which hosts Club Manager.
-		"tag:crouton-devices": [],
+		"tag:crouton-devices": [
+			"group:crouton-committee",
+		],
 
-		// Devices which only VEX members should have access to. Will be used for remote access to team's Jetson Nano machines
-		"tag:vex-devices": [],
-	},
+		// Devices which only VEX members should have access to. Will be used for remote access to team's Jetson Nano machines.
+		"tag:vex-devices": [
+			"group:vex",
+		],
+
+		// Devices which should be shared with all members of the tailnet. Any member of the Tailnet can apply this to their 
+        // own devices if they want other members of the tailnet to be able to access their device over Tailscale.
+		"tag:public-devices": [
+			"autogroup:member"],
+		},
 
 	// Test access rules every time they're saved.
 	// "tests": [
