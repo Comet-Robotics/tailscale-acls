@@ -15,6 +15,11 @@ set -euo pipefail
 
 MARKER='<!-- acl-lint-report -->'
 CHECKBOX='- [ ] **Format it for me.** Tick this box (or comment `/fmt`) to run the formatter and commit the result to this branch.'
+# Ticking the box needs write access, because the workflow behind it pushes a
+# commit. In practice that excludes nobody who could have opened a same-repo PR
+# -- creating the branch needed write access too -- but say so rather than
+# letting someone click a box that silently refuses them.
+NEEDS_WRITE='<sub>Requires write access, since it pushes a commit. Without it, run `python3 scripts/fmt_policy.py` locally and push the result.</sub>'
 BODY="$(mktemp)"
 MAX_LINES=120
 
@@ -31,6 +36,8 @@ MAX_LINES=120
     echo
     if [ "${SAME_REPO}" = "true" ]; then
       echo "$CHECKBOX"
+      echo
+      echo "$NEEDS_WRITE"
     else
       echo "> This PR comes from a fork, so the fix can't be pushed for you."
       echo "> Run \`python3 scripts/fmt_policy.py\` locally and push the result."

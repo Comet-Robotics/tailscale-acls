@@ -112,9 +112,10 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # A push made with GITHUB_TOKEN does not start new workflow runs, so the
-      # report comment is rewritten here from the formatted tree. The *check* on
-      # the PR stays red until someone re-runs it or pushes again -- the comment
-      # below says so.
+      # report comment is rewritten here from the formatted tree. The `acls`
+      # check keeps whatever it last reported; re-running it does NOT help,
+      # because a re-run reuses the original commit SHA. The reply below says
+      # what actually does work.
       - name: Rewrite the lint report
         # Runs even when nothing changed: regenerating the comment from the
         # template is also what unticks the box, so it can be used again.
@@ -133,9 +134,10 @@ jobs:
         run: |
           case "${{ steps.fmt.outputs.changed }}" in
             true)
-              body="$(printf '%s\n\n%s\n' \
+              body="$(printf '%s\n\n%s\n\n%s\n' \
                 "Formatted \`policy.hujson\` and pushed \`${{ steps.fmt.outputs.sha }}\` to \`${{ steps.pr.outputs.head_ref }}\`." \
-                "A commit pushed by \`GITHUB_TOKEN\` doesn't start a new workflow run, so **re-run the failed Sync Tailscale ACLs check** (or push anything else) to turn it green.")"
+                "**The \`acls\` check needs a fresh run, and re-running it won't give you one** -- GitHub re-runs a workflow against the commit that originally triggered it, which is the unformatted one." \
+                "Either push any commit (an empty one is enough: \`git commit --allow-empty -m rerun && git push\`), or close and reopen this PR -- reopening starts a run against the current head, and the PR author can do it without write access.")"
               reaction="+1" ;;
             false)
               body="\`policy.hujson\` was already formatted -- nothing to commit."
