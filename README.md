@@ -65,6 +65,12 @@ To set it up:
 7. Add two repo secrets: `FMT_APP_ID` (the app ID) and `FMT_APP_PRIVATE_KEY` (the
    whole `.pem`, `-----BEGIN` line and all).
 
+Step 6 is the one that's easy to skip — creating an app doesn't install it, and
+without an installation on this repo the token request returns `404` (a bad key
+returns `401`, so the two are easy to tell apart). Either way the formatter keeps
+working: if the token can't be minted, the push falls back to `GITHUB_TOKEN` and
+the approval click comes back.
+
 Installation tokens are short-lived (an hour), but the private key is durable — it's
 the one credential in this repo that needs rotating, and it only grants
 `contents:write` on this repo. Rotate it by generating a new key, replacing the

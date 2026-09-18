@@ -101,6 +101,11 @@ jobs:
       - name: Mint an app push token
         id: apptoken
         if: env.HAVE_APP == 'true'
+        # Never fail the formatter over app configuration. If the app isn't
+        # installed on this repo, or its key has been rotated out, this step
+        # fails, the token comes back empty, and everything below falls back to
+        # GITHUB_TOKEN -- the fix still lands, it just needs the approval click.
+        continue-on-error: true
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.FMT_APP_ID }}
@@ -140,7 +145,7 @@ jobs:
       - name: Rewrite the lint report
         # Runs even when nothing changed: regenerating the comment from the
         # template is also what unticks the box, so it can be used again.
-        if: steps.fmt.conclusion == 'success' && env.HAVE_APP != 'true'
+        if: steps.fmt.conclusion == 'success' && steps.apptoken.outputs.token == ''
         env:
           SAME_REPO: "true"
           SHA: ${{ steps.fmt.outputs.sha }}
@@ -152,11 +157,15 @@ jobs:
         # The guard steps above post their own explanation when they refuse, so
         # this only reports on runs that got as far as the branch.
         if: always() && steps.pr.outcome == 'success'
+        env:
+          # What the push actually used, which is not the same as what was
+          # configured -- see the fallback note on the mint step.
+          USED_APP: ${{ steps.apptoken.outputs.token != '' }}
         run: |
           case "${{ steps.fmt.outputs.changed }}" in
             true)
               pushed="Formatted \`policy.hujson\` and pushed \`${{ steps.fmt.outputs.sha }}\` to \`${{ steps.pr.outputs.head_ref }}\`."
-              if [ "$HAVE_APP" = "true" ]; then
+              if [ "$USED_APP" = "true" ]; then
                 body="$(printf '%s %s\n' "$pushed" \
                   "The checks are re-running against it now.")"
               else
