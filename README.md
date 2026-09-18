@@ -36,12 +36,40 @@ fires `issue_comment: edited`, which is the closest thing.) It needs write acces
 since it pushes a commit, and it can't push to a fork — fork authors get told to
 run the formatter locally instead.
 
-One wrinkle: a commit pushed by `GITHUB_TOKEN` doesn't start a new workflow run,
-and **re-running the `acls` check won't help**, because a re-run reuses the commit
-that triggered the original run. To get a fresh run on the formatted commit, push
-any commit (`git commit --allow-empty -m rerun && git push`) or close and reopen
-the PR. Reopening works even without write access, so it's the one a fork author
-can use.
+#### Making the fix self-completing
+
+A commit pushed by `GITHUB_TOKEN` doesn't start a new workflow run, so out of the
+box the fix lands but the `acls` check doesn't re-run. **Re-running it won't help
+either** — a re-run reuses the commit that triggered the original run, i.e. the
+unformatted one. Without the app configured, the bot tells the author to push any
+commit (`git commit --allow-empty -m rerun && git push`) or close and reopen the PR
+(which works without write access, so it's the one a fork author can use).
+
+A GitHub App's push *does* start workflow runs, so configuring one makes the fix
+self-completing. `lint-fix.yml` picks this up automatically: if `FMT_APP_ID` and
+`FMT_APP_PRIVATE_KEY` are both set it mints an installation token and pushes with
+that, and otherwise it falls back to the above. Nothing to change in the workflow
+either way.
+
+To set it up:
+
+1. **Org Settings → Developer settings → GitHub Apps → New GitHub App.** Own it at
+   the org, not personally, so it outlives whoever made it.
+2. Name it something like `Comet ACL Formatter`, set the homepage to this repo, and
+   **uncheck Webhook → Active** — it receives nothing.
+3. Under **Repository permissions**, grant **Contents: Read and write**. Nothing
+   else: the workflow still uses `GITHUB_TOKEN` for comments and PR reads, so the
+   app only needs to push.
+4. Set **Where can this app be installed** to *Only on this account*, then create it.
+5. Note the **App ID**, and **Generate a private key** (downloads a `.pem`).
+6. **Install** the app, choosing *Only select repositories* → this repo.
+7. Add two repo secrets: `FMT_APP_ID` (the app ID) and `FMT_APP_PRIVATE_KEY` (the
+   whole `.pem`, `-----BEGIN` line and all).
+
+Installation tokens are short-lived (an hour), but the private key is durable — it's
+the one credential in this repo that needs rotating, and it only grants
+`contents:write` on this repo. Rotate it by generating a new key, replacing the
+secret, then deleting the old key in the app's settings.
 
 Two notes for anyone editing the workflow:
 
