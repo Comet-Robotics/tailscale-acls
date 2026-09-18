@@ -164,7 +164,8 @@ jobs:
         run: |
           case "${{ steps.fmt.outputs.changed }}" in
             true)
-              pushed="Formatted \`policy.hujson\` and pushed \`${{ steps.fmt.outputs.sha }}\` to \`${{ steps.pr.outputs.head_ref }}\`."
+              sha="${{ steps.fmt.outputs.sha }}"
+              pushed="Formatted \`policy.hujson\` and pushed \`${sha:0:7}\` to \`${{ steps.pr.outputs.head_ref }}\`."
               if [ "$USED_APP" = "true" ]; then
                 body="$(printf '%s %s\n' "$pushed" \
                   "The checks are re-running against it now.")"
