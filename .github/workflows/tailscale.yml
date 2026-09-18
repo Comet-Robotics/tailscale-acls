@@ -6,22 +6,64 @@ on:
   pull_request:
     branches: ["main"]
 
-permissions:
-  contents: read
-  # Required so the Tailscale action can request a GitHub OIDC token and
-  # exchange it for a tailnet API token via federated identity.
-  id-token: write
+permissions: {}
+
+concurrency:
+  group: acls-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  acls:
+  # Runs on both events, before the tailnet is touched: a malformed policy or a
+  # collapsed group array fails the PR rather than reaching Tailscale. On a PR it
+  # also reports the result as a single comment that it rewrites on each push.
+  lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Only this job writes to the PR, and only to post its own report comment.
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
 
-      # Runs on both events, before the tailnet is touched: a malformed policy
-      # or a collapsed group array fails the PR rather than reaching Tailscale.
       - name: Lint policy file
-        run: python3 scripts/fmt_policy.py --check
+        id: lint
+        run: |
+          set +e
+          out="$(python3 scripts/fmt_policy.py --check 2>&1)"
+          code=$?
+          set -e
+          echo "$out"
+          {
+            echo 'output<<LINT_EOF'
+            echo "$out"
+            echo 'LINT_EOF'
+          } >> "$GITHUB_OUTPUT"
+          echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Report result on the PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          LINT_OUTPUT: ${{ steps.lint.outputs.output }}
+          LINT_CODE: ${{ steps.lint.outputs.exit-code }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: scripts/lint_comment.sh
+
+  acls:
+    runs-on: ubuntu-latest
+    # The tailnet is only touched once the policy file has been shown to parse.
+    needs: lint
+    permissions:
+      contents: read
+      # Required so the Tailscale action can request a GitHub OIDC token and
+      # exchange it for a tailnet API token via federated identity.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
 
       # Pull requests get a READ-ONLY credential (policy_file:read), whose trust
       # credential is scoped to subject repo:...@<repo id>:pull_request. A PR therefore

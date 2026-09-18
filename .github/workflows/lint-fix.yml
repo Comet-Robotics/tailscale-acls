@@ -1,0 +1,152 @@
+name: Format policy on request
+
+# GitHub has no workflow trigger for emoji reactions, so the one-click path is a
+# task-list box: ticking the box in the lint report comment is an
+# `issue_comment: edited` event. Commenting `/fmt` does the same thing.
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions: {}
+
+concurrency:
+  # One formatter at a time per PR -- two concurrent runs would race on the push.
+  group: lint-fix-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  fmt:
+    # `sender` is whoever typed or edited; skipping our own edits stops this
+    # workflow from retriggering itself when it rewrites the report comment.
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.sender.login != 'github-actions[bot]' &&
+      (
+        (github.event.action == 'created' &&
+         startsWith(github.event.comment.body, '/fmt')) ||
+        (github.event.action == 'edited' &&
+         contains(github.event.comment.body, '<!-- acl-lint-report -->') &&
+         (contains(github.event.comment.body, '- [x] **Format it for me.**') ||
+          contains(github.event.comment.body, '- [X] **Format it for me.**')))
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      # Pushes the reformatted policy file back onto the PR branch.
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      COMMENT_ID: ${{ github.event.comment.id }}
+      ACTOR: ${{ github.event.sender.login }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Acknowledge the request
+        # Only for `/fmt`: on the checkbox path the "comment" is the bot's own
+        # report, and reactions there would pile up run after run.
+        if: github.event.action == 'created'
+        run: |
+          gh api --method POST --silent \
+            "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content=eyes || true
+
+      # `issue_comment` carries no branch and no permission check of its own:
+      # anyone who can comment can fire this event. Both are established here,
+      # before the PR's own code is checked out.
+      - name: Check the requester can write to this repo
+        run: |
+          level="$(gh api "repos/${REPO}/collaborators/${ACTOR}/permission" \
+            --jq .permission 2>/dev/null || echo none)"
+          if [ "$level" != "admin" ] && [ "$level" != "write" ]; then
+            gh api --method POST "repos/${REPO}/issues/${PR}/comments" \
+              -f "body=@${ACTOR} doesn't have write access to this repository, so I won't push a commit to this branch."
+            exit 1
+          fi
+
+      - name: Resolve the PR branch
+        id: pr
+        run: |
+          gh pr view "$PR" --repo "$REPO" \
+            --json headRefName,headRepository,headRepositoryOwner,state \
+            > pr.json
+          state="$(jq -r .state pr.json)"
+          head_repo="$(jq -r '.headRepositoryOwner.login + "/" + .headRepository.name' pr.json)"
+          head_ref="$(jq -r .headRefName pr.json)"
+
+          if [ "$state" != "OPEN" ]; then
+            gh api --method POST "repos/${REPO}/issues/${PR}/comments" \
+              -f "body=This PR is \`${state}\`, so there's nothing to format."
+            exit 1
+          fi
+          if [ "$head_repo" != "$REPO" ]; then
+            gh api --method POST "repos/${REPO}/issues/${PR}/comments" \
+              -f "body=This PR comes from \`${head_repo}\`, and this workflow's token can't push to a fork. Run \`python3 scripts/fmt_policy.py\` locally and push the result."
+            exit 1
+          fi
+          echo "head_ref=$head_ref" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.head_ref }}
+          # Leaves the push credential in .git/config for the push step below.
+          persist-credentials: true
+
+      - name: Format and commit
+        id: fmt
+        run: |
+          python3 scripts/fmt_policy.py
+          if git diff --quiet -- policy.hujson; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '%s\n\n%s\n' \
+            "style: format policy.hujson" \
+            "Requested by @${ACTOR} via ${RUN_URL}." > "$RUNNER_TEMP/msg"
+          git commit -F "$RUNNER_TEMP/msg" -- policy.hujson
+          git push origin "HEAD:${{ steps.pr.outputs.head_ref }}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # A push made with GITHUB_TOKEN does not start new workflow runs, so the
+      # report comment is rewritten here from the formatted tree. The *check* on
+      # the PR stays red until someone re-runs it or pushes again -- the comment
+      # below says so.
+      - name: Rewrite the lint report
+        # Runs even when nothing changed: regenerating the comment from the
+        # template is also what unticks the box, so it can be used again.
+        if: steps.fmt.conclusion == 'success'
+        env:
+          SAME_REPO: "true"
+          SHA: ${{ steps.fmt.outputs.sha }}
+        run: |
+          out="$(python3 scripts/fmt_policy.py --check 2>&1)" && code=0 || code=$?
+          LINT_OUTPUT="$out" LINT_CODE="$code" scripts/lint_comment.sh
+
+      - name: Say what happened
+        # The guard steps above post their own explanation when they refuse, so
+        # this only reports on runs that got as far as the branch.
+        if: always() && steps.pr.outcome == 'success'
+        run: |
+          case "${{ steps.fmt.outputs.changed }}" in
+            true)
+              body="$(printf '%s\n\n%s\n' \
+                "Formatted \`policy.hujson\` and pushed \`${{ steps.fmt.outputs.sha }}\` to \`${{ steps.pr.outputs.head_ref }}\`." \
+                "A commit pushed by \`GITHUB_TOKEN\` doesn't start a new workflow run, so **re-run the failed Sync Tailscale ACLs check** (or push anything else) to turn it green.")"
+              reaction="+1" ;;
+            false)
+              body="\`policy.hujson\` was already formatted -- nothing to commit."
+              reaction="+1" ;;
+            *)
+              body="The formatter didn't finish. See the [run log](${RUN_URL})."
+              reaction="-1" ;;
+          esac
+          gh api --method POST --silent "repos/${REPO}/issues/${PR}/comments" -f "body=$body"
+          if [ "${{ github.event.action }}" = "created" ]; then
+            gh api --method POST --silent \
+              "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+              -f "content=$reaction" || true
+          fi
