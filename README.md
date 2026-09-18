@@ -38,18 +38,17 @@ run the formatter locally instead.
 
 #### Making the fix self-completing
 
-A commit pushed by `GITHUB_TOKEN` doesn't start a new workflow run, so out of the
-box the fix lands but the `acls` check doesn't re-run. **Re-running it won't help
-either** — a re-run reuses the commit that triggered the original run, i.e. the
-unformatted one. Without the app configured, the bot tells the author to push any
-commit (`git commit --allow-empty -m rerun && git push`) or close and reopen the PR
-(which works without write access, so it's the one a fork author can use).
+When the bot pushes the formatted commit with `GITHUB_TOKEN`, GitHub *does* create
+a `pull_request` run for it — but holds it in an **approval-required** state, so the
+`acls` check stays stale until someone with write access clicks **Approve and run**
+on the PR's checks. (Re-running the old failed check is not a substitute: a re-run
+reuses the commit that triggered the original run, i.e. the unformatted one.)
 
-A GitHub App's push *does* start workflow runs, so configuring one makes the fix
-self-completing. `lint-fix.yml` picks this up automatically: if `FMT_APP_ID` and
-`FMT_APP_PRIVATE_KEY` are both set it mints an installation token and pushes with
-that, and otherwise it falls back to the above. Nothing to change in the workflow
-either way.
+A GitHub App's push is not held for approval, so configuring one makes the fix
+self-completing, with no approval click. `lint-fix.yml` picks this up
+automatically: if `FMT_APP_ID` and `FMT_APP_PRIVATE_KEY` are both set it mints an
+installation token and pushes with that, and otherwise it falls back to the
+approval flow above. Nothing to change in the workflow either way.
 
 To set it up:
 
