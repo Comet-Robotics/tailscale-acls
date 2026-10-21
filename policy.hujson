@@ -32,6 +32,20 @@
 			"dst":    ["autogroup:self"],
 			"users":  ["autogroup:nonroot", "root"],
 		},
+		// Allow CROUTON Committee members to SSH into any CROUTON device as any user.
+		{
+			"action": "accept",
+			"src":    ["group:crouton-committee"],
+			"dst":    ["tag:crouton-devices"],
+			"users":  ["*"],
+		},
+		// Allow VEX team members to SSH into any VEX device as any user.
+		{
+			"action": "accept",
+			"src":    ["group:vex"],
+			"dst":    ["tag:vex-devices"],
+			"users":  ["*"],
+		},
 	],
 
 	"nodeAttrs": [
@@ -47,6 +61,7 @@
 	"groups": {
 		"group:crouton-committee": [
 			"jasonappah@github",
+			"pederjohnson@github"
 		],
 
 		"group:vex": [
