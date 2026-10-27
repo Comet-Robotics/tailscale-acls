@@ -10,6 +10,14 @@
 			"dst": ["tag:crouton-devices"],
 			"ip":  ["*"],
 		},
+		// Allow CROUTON Committee members to reach the lab LAN (192.168.1.0/24) through the
+		// subnet router (ryan). Without this grant, the control plane strips the subnet route
+		// from clients' netmaps, so the route never reaches them even when approved.
+		{
+			"src": ["group:crouton-committee"],
+			"dst": ["192.168.1.0/24"],
+			"ip":  ["*"],
+		},
 		// Only allow VEX U project team members to access VEX devices. Will be used for remote access to team's Jetson Nano machines.
 		{
 			"src": ["group:vex"],
@@ -95,6 +103,14 @@
 		"tag:public-devices": [
 			"autogroup:member",
 		],
+	},
+
+	// Subnet routes approved automatically when advertised by CROUTON Committee members,
+	// so re-advertising after a reinstall doesn't require a manual console approval.
+	"autoApprovers": {
+		"routes": {
+			"192.168.1.0/24": ["group:crouton-committee"],
+		},
 	},
 
 	// Test access rules every time they're saved.
