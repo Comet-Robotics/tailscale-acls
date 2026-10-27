@@ -109,7 +109,7 @@
 	// so re-advertising after a reinstall doesn't require a manual console approval.
 	"autoApprovers": {
 		"routes": {
-			"192.168.1.0/24": ["group:crouton-committee"],
+			"192.168.1.0/24": ["group:crouton-committee", "tag:crouton-devices"],
 		},
 	},
 
