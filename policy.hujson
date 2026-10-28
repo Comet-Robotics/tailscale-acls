@@ -18,6 +18,12 @@
 			"dst": ["192.168.1.0/24"],
 			"ip":  ["*"],
 		},
+		// Allow CROUTON Committee members to route their internet traffic through exit nodes
+		{
+			"src": ["group:crouton-committee"],
+			"dst": ["autogroup:internet"],
+			"ip":  ["*"],
+		},
 		// Only allow VEX U project team members to access VEX devices. Will be used for remote access to team's Jetson Nano machines.
 		{
 			"src": ["group:vex"],
@@ -28,15 +34,6 @@
 		{
 			"src": ["autogroup:member"],
 			"dst": ["tag:public-devices"],
-			"ip":  ["*"],
-		},
-		// Allow CROUTON Committee members to route their internet traffic through ECRIT
-		// nodes (such as one they run at home). This necessarily applies to *all* approved
-		// exit nodes in the tailnet, not just ones they own - Tailscale cannot scope ACLs
-		// to specific exit nodes.
-		{
-			"src": ["group:crouton-committee"],
-			"dst": ["autogroup:internet"],
 			"ip":  ["*"],
 		},
 	],
