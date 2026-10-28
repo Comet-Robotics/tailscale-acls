@@ -30,6 +30,15 @@
 			"dst": ["tag:public-devices"],
 			"ip":  ["*"],
 		},
+		// Allow CROUTON Committee members to route their internet traffic through ECRIT
+		// nodes (such as one they run at home). This necessarily applies to *all* approved
+		// exit nodes in the tailnet, not just ones they own - Tailscale cannot scope ACLs
+		// to specific exit nodes.
+		{
+			"src": ["group:crouton-committee"],
+			"dst": ["autogroup:internet"],
+			"ip":  ["*"],
+		},
 	],
 
 	"ssh": [
@@ -106,12 +115,14 @@
 		],
 	},
 
-	// Subnet routes approved automatically when advertised by CROUTON Committee members,
-	// so re-advertising after a reinstall doesn't require a manual console approval.
+	// Subnet routes and exit nodes approved automatically when advertised by
+	// CROUTON Committee members or committee-owned tagged devices, so committing
+	// them after advertising doesn't require a manual console approval.
 	"autoApprovers": {
 		"routes": {
 			"192.168.1.0/24": ["group:crouton-committee", "tag:crouton-devices"],
 		},
+		"exitNode": ["group:crouton-committee", "tag:crouton-devices"],
 	},
 
 	// Test access rules every time they're saved.
